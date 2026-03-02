@@ -1,0 +1,74 @@
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Login</title>
+    <style>
+        body{
+            margin:0;
+            font-family: Arial;
+            height:100vh;
+            background-image: url('/Imagenes/Fondo.jpg');
+            background-size: cover;
+            background-position:center;
+        }
+        .capa{
+            height:100vh;
+            background: rgba(0,0,0,0.5);
+            display:flex;
+            justify-content:center;
+            align-items:center;
+        }
+        .caja{
+            width:320px;
+            background: rgba(255,255,255,0.85);
+            padding:20px;
+            border-radius:10px;
+        }
+        input{
+            width:100%;
+            padding:8px;
+            margin-top:6px;
+            margin-bottom:12px;
+        }
+        button{
+            width:100%;
+            padding:10px;
+            background:#2ecc71;
+            border:none;
+            color:white;
+            font-weight:bold;
+            cursor:pointer;
+        }
+        .error{ color:red; margin-top:10px; }
+    </style>
+</head>
+<body>
+    <div class="capa">
+        <div class="caja">
+            <h2>Autos Colombia</h2>
+
+            <form asp-action="Ingresar" method="post">
+                <label>Usuario</label>
+                <input type="text" name="usuario" required>
+
+                <label>Contraseña</label>
+                <input type="password" name="clave" required>
+
+                <button type="submit">Ingresar</button>
+            </form>
+
+            @if(ViewBag.Error != null)
+            {
+                <div class="error">@ViewBag.Error</div>
+            }
+
+            <p style="font-size:12px;">Demo: admin / 1234</p>
+        </div>
+    </div>
+</body>
+</html>

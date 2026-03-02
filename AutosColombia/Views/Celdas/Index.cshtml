@@ -1,0 +1,260 @@
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Celdas</title>
+
+    <style>
+        body{
+            margin:0;
+            font-family: Arial;
+            background-image: url('/Imagenes/Fondo.jpg');
+            background-size: cover;
+            background-position:center;
+        }
+
+        .capa{
+            background: rgba(0,0,0,0.6);
+            min-height:100vh;
+            padding:30px;
+        }
+
+        .caja{
+            background: rgba(255,255,255,0.92);
+            padding:20px;
+            max-width:900px;
+            margin:auto;
+            border-radius:10px;
+        }
+
+        input, select{
+            width:100%;
+            padding:6px;
+            margin-bottom:10px;
+        }
+
+        .fila-botones{
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-top:8px;
+        }
+
+        button, a{
+            padding:8px 12px;
+            color:white;
+            border:none;
+            text-decoration:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
+
+        .btn-guardar{ background:#2ecc71; }
+        .btn-cancelar{ background:#95a5a6; }
+        .btn-vehiculos{ background:#3498db; }
+        .btn-logout{ background:#e74c3c; margin-left:auto; }
+
+        table{
+            width:100%;
+            border-collapse: collapse;
+            margin-top:20px;
+        }
+
+        th, td{
+            border:1px solid #ccc;
+            padding:8px;
+            text-align:center;
+        }
+
+        th{
+            background:#eee;
+        }
+
+        .acciones button{
+            padding:6px 10px;
+            border-radius:5px;
+        }
+        .acciones .edit{ background:#f39c12; }
+        .acciones .del{ background:#e74c3c; }
+    </style>
+</head>
+
+<body>
+<div class="capa">
+<div class="caja">
+
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <h2 style="margin:0;">Registro de Celdas</h2>
+        <a class="btn-logout" asp-controller="Login" asp-action="Salir">Cerrar sesión</a>
+    </div>
+
+    <form id="formCelda" onsubmit="return false;">
+        <input type="hidden" id="modoEdicion" value="">
+        <label>Código Celda</label>
+        <input type="text" id="codigo" placeholder="Ej: A01" required>
+
+        <label>Estado</label>
+        <select id="estado">
+            <option>Disponible</option>
+            <option>Ocupada</option>
+            <option>Inactiva</option>
+        </select>
+
+        <div class="fila-botones">
+            <button type="button" class="btn-guardar" onclick="guardarCelda()">Guardar</button>
+            <button type="button" class="btn-cancelar" onclick="cancelarEdicion()">Cancelar</button>
+            <a class="btn-vehiculos" asp-controller="Vehiculos" asp-action="Index">Ir a Vehículos</a>
+        </div>
+        <small style="display:block; margin-top:8px; color:#333;">
+            * Los datos se guardan en el navegador (localStorage), así no se borran al cambiar de interfaz.
+        </small>
+    </form>
+
+    <table id="tablaCeldas">
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+</div>
+</div>
+
+<script>
+const KEY_CELDAS = "autoscolombia_celdas";
+const KEY_VEHICULOS = "autoscolombia_vehiculos";
+
+function getJson(key){
+    try{
+        return JSON.parse(localStorage.getItem(key) || "[]");
+    }catch(e){
+        return [];
+    }
+}
+function setJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizarCodigo(codigo){
+    return (codigo || "").trim().toUpperCase();
+}
+
+function cargarTabla(){
+    const celdas = getJson(KEY_CELDAS);
+    const tbody = document.querySelector("#tablaCeldas tbody");
+    tbody.innerHTML = "";
+
+    celdas.forEach(c => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${c.codigo}</td>
+            <td>${c.estado}</td>
+            <td class="acciones">
+                <button class="edit" type="button" onclick="editarCelda('${c.codigo}')">Editar</button>
+                <button class="del" type="button" onclick="eliminarCelda('${c.codigo}')">Eliminar</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function guardarCelda(){
+    let codigo = normalizarCodigo(document.getElementById("codigo").value);
+    let estado = document.getElementById("estado").value;
+    let modo = document.getElementById("modoEdicion").value; // "" o codigoOriginal
+
+    if(!codigo){
+        alert("Ingrese código de celda");
+        return;
+    }
+
+    let celdas = getJson(KEY_CELDAS);
+
+    // Si está creando, no permitir duplicados.
+    // Si está editando, no permitir cambiar el código a uno ya existente.
+    const existe = celdas.some(c => c.codigo === codigo);
+    if(modo === ""){
+        if(existe){
+            alert("Esa celda ya existe.");
+            return;
+        }
+        celdas.push({ codigo, estado });
+    }else{
+        const codigoOriginal = modo;
+        // si cambió el código y ese nuevo ya existe
+        if(codigo !== codigoOriginal && existe){
+            alert("No puede cambiar el código a uno que ya existe.");
+            return;
+        }
+
+        celdas = celdas.map(c => {
+            if(c.codigo === codigoOriginal){
+                return { codigo, estado };
+            }
+            return c;
+        });
+
+        // si cambió el código, también toca actualizar vehículos que apunten a esa celda
+        if(codigo !== codigoOriginal){
+            let vehiculos = getJson(KEY_VEHICULOS);
+            vehiculos = vehiculos.map(v => {
+                if((v.celda || "") === codigoOriginal){
+                    v.celda = codigo;
+                }
+                return v;
+            });
+            setJson(KEY_VEHICULOS, vehiculos);
+        }
+    }
+
+    setJson(KEY_CELDAS, celdas);
+    cancelarEdicion();
+    cargarTabla();
+}
+
+function editarCelda(codigo){
+    const celdas = getJson(KEY_CELDAS);
+    const celda = celdas.find(c => c.codigo === codigo);
+    if(!celda) return;
+
+    document.getElementById("codigo").value = celda.codigo;
+    document.getElementById("estado").value = celda.estado;
+    document.getElementById("modoEdicion").value = celda.codigo;
+}
+
+function eliminarCelda(codigo){
+    // Regla: no dejar borrar si hay vehículo activo usando esa celda (sin salida)
+    const vehiculos = getJson(KEY_VEHICULOS);
+    const activos = vehiculos.some(v => (v.celda || "") === codigo && !(v.salida && v.salida.trim() !== ""));
+    if(activos){
+        alert("No puedes eliminar esta celda porque tiene un vehículo activo (sin salida).");
+        return;
+    }
+
+    if(!confirm("¿Seguro que deseas eliminar la celda " + codigo + "?")) return;
+
+    let celdas = getJson(KEY_CELDAS);
+    celdas = celdas.filter(c => c.codigo !== codigo);
+    setJson(KEY_CELDAS, celdas);
+    cargarTabla();
+}
+
+function cancelarEdicion(){
+    document.getElementById("modoEdicion").value = "";
+    document.getElementById("formCelda").reset();
+}
+
+// Inicial
+cargarTabla();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,373 @@
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Vehículos</title>
+
+    <style>
+        body{
+            margin:0;
+            font-family: Arial;
+            background-image: url('/Imagenes/Fondo.jpg');
+            background-size: cover;
+            background-position:center;
+        }
+
+        .capa{
+            background: rgba(0,0,0,0.6);
+            min-height:100vh;
+            padding:30px;
+        }
+
+        .caja{
+            background: rgba(255,255,255,0.92);
+            padding:20px;
+            max-width:1000px;
+            margin:auto;
+            border-radius:10px;
+        }
+
+        input{
+            width:100%;
+            padding:6px;
+            margin-bottom:10px;
+        }
+
+        .fila-botones{
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-top:8px;
+            align-items:center;
+        }
+
+        button, a{
+            padding:8px 12px;
+            color:white;
+            border:none;
+            text-decoration:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
+
+        .guardar{ background:#2ecc71; }
+        .cancelar{ background:#95a5a6; }
+        .celdas{ background:#3498db; }
+        .volver{ background:#8e44ad; }
+        .logout{ background:#e74c3c; margin-left:auto; }
+
+        table{
+            width:100%;
+            border-collapse: collapse;
+            margin-top:20px;
+        }
+
+        th, td{
+            border:1px solid #ccc;
+            padding:8px;
+            text-align:center;
+        }
+
+        th{
+            background:#eee;
+        }
+
+        .acciones button{
+            padding:6px 10px;
+            border-radius:5px;
+        }
+        .acciones .edit{ background:#f39c12; }
+        .acciones .del{ background:#e74c3c; }
+    </style>
+</head>
+
+<body>
+<div class="capa">
+<div class="caja">
+
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <h2 style="margin:0;">Registro de Vehículos</h2>
+        <button type="button" class="volver" onclick="history.back()">Volver atrás</button>
+        <a class="logout" asp-controller="Login" asp-action="Salir">Cerrar sesión</a>
+    </div>
+
+    <form id="formVehiculo" onsubmit="return false;">
+        <input type="hidden" id="modoEdicion" value="">
+
+        <label>Placa</label>
+        <input type="text" id="placa" placeholder="Ej: ABC123" required>
+
+        <label>Fecha Entrada</label>
+        <input type="datetime-local" id="entrada" required>
+
+        <label>Fecha Salida</label>
+        <input type="datetime-local" id="salida">
+
+        <label>Celda (debe existir)</label>
+        <input type="text" id="celda" list="listaCeldas" placeholder="Ej: A01" required>
+        <datalist id="listaCeldas"></datalist>
+
+        <div class="fila-botones">
+            <button type="button" class="guardar" onclick="guardarVehiculo()">Guardar</button>
+            <button type="button" class="cancelar" onclick="cancelarEdicion()">Cancelar</button>
+            <a class="celdas" asp-controller="Celdas" asp-action="Index">Ir a Celdas</a>
+        </div>
+
+        <small style="display:block; margin-top:8px; color:#333;">
+            * No permite guardar si la celda no existe o está Inactiva/Ocupada.
+        </small>
+    </form>
+
+    <table id="tabla">
+        <thead>
+            <tr>
+                <th>Placa</th>
+                <th>Entrada</th>
+                <th>Salida</th>
+                <th>Celda</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+</div>
+</div>
+
+<script>
+const KEY_CELDAS = "autoscolombia_celdas";
+const KEY_VEHICULOS = "autoscolombia_vehiculos";
+
+function getJson(key){
+    try{
+        return JSON.parse(localStorage.getItem(key) || "[]");
+    }catch(e){
+        return [];
+    }
+}
+function setJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizarPlaca(placa){
+    return (placa || "").trim().toUpperCase();
+}
+function normalizarCodigo(codigo){
+    return (codigo || "").trim().toUpperCase();
+}
+
+function cargarListaCeldas(){
+    const celdas = getJson(KEY_CELDAS);
+    const dl = document.getElementById("listaCeldas");
+    dl.innerHTML = "";
+    celdas.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.codigo;
+        dl.appendChild(opt);
+    });
+}
+
+function cargarTabla(){
+    const vehiculos = getJson(KEY_VEHICULOS);
+    const tbody = document.querySelector("#tabla tbody");
+    tbody.innerHTML = "";
+
+    vehiculos.forEach(v => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${v.placa}</td>
+            <td>${v.entrada || ""}</td>
+            <td>${v.salida || ""}</td>
+            <td>${v.celda || ""}</td>
+            <td class="acciones">
+                <button class="edit" type="button" onclick="editarVehiculo('${v.id}')">Editar</button>
+                <button class="del" type="button" onclick="eliminarVehiculo('${v.id}')">Eliminar</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function validarCeldaDisponible(codigo, vehiculoIdEnEdicion){
+    const celdas = getJson(KEY_CELDAS);
+    const celda = celdas.find(c => c.codigo === codigo);
+
+    if(!celda){
+        return { ok:false, msg:"La celda no existe. Primero regístrala en Celdas." };
+    }
+    if(celda.estado === "Inactiva"){
+        return { ok:false, msg:"La celda está Inactiva." };
+    }
+
+    // Si está Ocupada, solo permitir si es la misma celda del vehículo que se está editando
+    if(celda.estado === "Ocupada"){
+        const vehiculos = getJson(KEY_VEHICULOS);
+        const v = vehiculos.find(x => x.id === vehiculoIdEnEdicion);
+        if(!v || v.celda !== codigo){
+            return { ok:false, msg:"La celda está Ocupada." };
+        }
+    }
+
+    return { ok:true, msg:"" };
+}
+
+function setEstadoCelda(codigo, estado){
+    let celdas = getJson(KEY_CELDAS);
+    celdas = celdas.map(c => c.codigo === codigo ? { codigo: c.codigo, estado } : c);
+    setJson(KEY_CELDAS, celdas);
+}
+
+function hayVehiculoActivoEnCelda(codigo, exceptoVehiculoId){
+    const vehiculos = getJson(KEY_VEHICULOS);
+    return vehiculos.some(v => v.id !== exceptoVehiculoId && (v.celda || "") === codigo && !(v.salida && v.salida.trim() !== ""));
+}
+
+function guardarVehiculo(){
+    let placa = normalizarPlaca(document.getElementById("placa").value);
+    let entrada = document.getElementById("entrada").value;
+    let salida = document.getElementById("salida").value;
+    let celda = normalizarCodigo(document.getElementById("celda").value);
+    let modo = document.getElementById("modoEdicion").value; // "" o id
+
+    if(!placa || !entrada || !celda){
+        alert("Complete los campos obligatorios (placa, entrada, celda).");
+        return;
+    }
+
+    const check = validarCeldaDisponible(celda, modo || null);
+    if(!check.ok){
+        alert(check.msg);
+        return;
+    }
+
+    let vehiculos = getJson(KEY_VEHICULOS);
+
+    if(modo === ""){
+        // Create
+        // Si hay un vehículo activo en esa celda, no permitir (por seguridad)
+        if(hayVehiculoActivoEnCelda(celda, null)){
+            alert("Esa celda ya tiene un vehículo activo.");
+            return;
+        }
+
+        const id = "V" + Date.now();
+        vehiculos.push({ id, placa, entrada, salida, celda });
+
+        // Marcar celda ocupada si el vehículo NO tiene salida
+        if(!salida){
+            setEstadoCelda(celda, "Ocupada");
+        }
+
+    }else{
+        // Update
+        const actual = vehiculos.find(v => v.id === modo);
+        if(!actual){
+            alert("No se encontró el registro para editar.");
+            cancelarEdicion();
+            return;
+        }
+
+        const celdaAnterior = actual.celda;
+
+        // Si cambió de celda y la nueva tiene vehículo activo, no permitir
+        if(celda !== celdaAnterior && hayVehiculoActivoEnCelda(celda, modo)){
+            alert("La celda nueva ya tiene un vehículo activo.");
+            return;
+        }
+
+        // Actualizar vehículo
+        vehiculos = vehiculos.map(v => v.id === modo ? { id: modo, placa, entrada, salida, celda } : v);
+        setJson(KEY_VEHICULOS, vehiculos);
+
+        // Lógica de estados de celdas:
+        // 1) Si cambió de celda, liberar la anterior si ya no hay activos ahí
+        if(celdaAnterior && celdaAnterior !== celda){
+            if(!hayVehiculoActivoEnCelda(celdaAnterior, null)){
+                // Solo dejar Disponible si no está Inactiva
+                const celdas = getJson(KEY_CELDAS);
+                const cAnt = celdas.find(c => c.codigo === celdaAnterior);
+                if(cAnt && cAnt.estado !== "Inactiva"){
+                    setEstadoCelda(celdaAnterior, "Disponible");
+                }
+            }
+        }
+
+        // 2) Para la celda actual: si no tiene salida => Ocupada, si tiene salida => Disponible (si no hay otros activos)
+        if(!salida){
+            setEstadoCelda(celda, "Ocupada");
+        }else{
+            if(!hayVehiculoActivoEnCelda(celda, null)){
+                const celdas = getJson(KEY_CELDAS);
+                const cNow = celdas.find(c => c.codigo === celda);
+                if(cNow && cNow.estado !== "Inactiva"){
+                    setEstadoCelda(celda, "Disponible");
+                }
+            }
+        }
+
+        cancelarEdicion();
+        cargarListaCeldas();
+        cargarTabla();
+        return;
+    }
+
+    setJson(KEY_VEHICULOS, vehiculos);
+
+    cancelarEdicion();
+    cargarListaCeldas();
+    cargarTabla();
+}
+
+function editarVehiculo(id){
+    const vehiculos = getJson(KEY_VEHICULOS);
+    const v = vehiculos.find(x => x.id === id);
+    if(!v) return;
+
+    document.getElementById("placa").value = v.placa || "";
+    document.getElementById("entrada").value = v.entrada || "";
+    document.getElementById("salida").value = v.salida || "";
+    document.getElementById("celda").value = v.celda || "";
+    document.getElementById("modoEdicion").value = v.id;
+}
+
+function eliminarVehiculo(id){
+    if(!confirm("¿Seguro que deseas eliminar este registro?")) return;
+
+    let vehiculos = getJson(KEY_VEHICULOS);
+    const v = vehiculos.find(x => x.id === id);
+
+    vehiculos = vehiculos.filter(x => x.id !== id);
+    setJson(KEY_VEHICULOS, vehiculos);
+
+    // Si era el único vehículo activo en esa celda, liberar
+    if(v && v.celda){
+        if(!hayVehiculoActivoEnCelda(v.celda, null)){
+            const celdas = getJson(KEY_CELDAS);
+            const cNow = celdas.find(c => c.codigo === v.celda);
+            if(cNow && cNow.estado !== "Inactiva"){
+                setEstadoCelda(v.celda, "Disponible");
+            }
+        }
+    }
+
+    cancelarEdicion();
+    cargarListaCeldas();
+    cargarTabla();
+}
+
+function cancelarEdicion(){
+    document.getElementById("modoEdicion").value = "";
+    document.getElementById("formVehiculo").reset();
+}
+
+// Inicial
+cargarListaCeldas();
+cargarTabla();
+</script>
+
+</body>
+</html>

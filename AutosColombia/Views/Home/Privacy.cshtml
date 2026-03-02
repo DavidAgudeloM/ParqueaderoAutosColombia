@@ -1,0 +1,72 @@
+﻿@{
+    ViewData["Title"] = "Iniciar sesión";
+}
+<!doctype html>
+<html lang="es">
+<head>
+   
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Autos Colombia - Login</title>
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <main class="page" >
+    <section class="card">
+      <header class="card__header">
+        <div class="brand">
+          <div class="brand__logo">AC</div>
+          <div>
+            <h1 class="brand__title">Autos Colombia</h1>
+            <p class="brand__subtitle">Gestión de Parqueadero</p>
+          </div>
+        </div>
+      </header>
+
+      <form class="form" action="#" method="post" autocomplete="on">
+        <label class="field">
+          <span class="field__label">Usuario</span>
+          <input class="field__input" type="text" name="usuario" placeholder="Ej: admin" required>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Contraseña</span>
+          <div class="password">
+            <input class="field__input" id="password" type="password" name="password" placeholder="••••••••" required>
+            <button class="password__toggle" type="button" id="toggleBtn" aria-label="Mostrar/ocultar contraseña">👁</button>
+          </div>
+        </label>
+
+        <div class="row">
+          <label class="check">
+            <input type="checkbox" name="remember">
+            <span>Recordarme</span>
+          </label>
+          <a class="link" href="#">¿Olvidaste tu contraseña?</a>
+        </div>
+
+        <button class="btn" type="submit">Iniciar sesión</button>
+
+        <p class="hint">
+          © <span id="year"></span> Autos Colombia · Acceso autorizado
+        </p>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    // Año automático
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Mostrar/Ocultar password
+    const toggleBtn = document.getElementById('toggleBtn');
+    const pass = document.getElementById('password');
+    toggleBtn.addEventListener('click', () => {
+      pass.type = pass.type === 'password' ? 'text' : 'password';
+      toggleBtn.textContent = pass.type === 'password' ? '👁' : '🙈';
+    });
+  </script>
+</body>
+</html>
+
+
