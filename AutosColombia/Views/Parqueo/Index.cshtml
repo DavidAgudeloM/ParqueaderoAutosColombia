@@ -1,0 +1,454 @@
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Registro de Parqueo</title>
+
+    <style>
+        body{
+            margin:0;
+            font-family: Arial;
+            background-image: url('/Imagenes/Fondo.jpg');
+            background-size: cover;
+            background-position:center;
+        }
+
+        .capa{
+            background: rgba(0,0,0,0.6);
+            min-height:100vh;
+            padding:30px;
+        }
+
+        .caja{
+            background: rgba(255,255,255,0.92);
+            padding:20px;
+            max-width:1100px;
+            margin:auto;
+            border-radius:10px;
+        }
+
+        input, select{
+            width:100%;
+            padding:6px;
+            margin-bottom:10px;
+        }
+
+        .grid{
+            display:grid;
+            grid-template-columns: 1fr 1fr;
+            gap:14px;
+        }
+        @@media (max-width: 800px){
+            .grid{ grid-template-columns: 1fr; }
+        }
+
+        .fila-botones{
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-top:8px;
+            align-items:center;
+        }
+
+        button, a{
+            padding:8px 12px;
+            color:white;
+            border:none;
+            text-decoration:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
+
+        .ingreso{ background:#2ecc71; }
+        .salida{ background:#e67e22; }
+        .cancelar{ background:#95a5a6; }
+        .vehiculos{ background:#3498db; }
+        .celdas{ background:#8e44ad; }
+        .logout{ background:#e74c3c; margin-left:auto; }
+
+        table{
+            width:100%;
+            border-collapse: collapse;
+            margin-top:20px;
+        }
+
+        th, td{
+            border:1px solid #ccc;
+            padding:8px;
+            text-align:center;
+        }
+
+        th{ background:#eee; }
+
+        .acciones button{
+            padding:6px 10px;
+            border-radius:5px;
+        }
+        .acciones .btn-salir{ background:#e67e22; }
+        .acciones .btn-del{ background:#e74c3c; }
+
+        .tarjeta{
+            border:1px solid #ddd;
+            border-radius:10px;
+            padding:12px;
+            background: rgba(255,255,255,0.75);
+        }
+
+        .nota{
+            margin-top:8px;
+            color:#333;
+        }
+    </style>
+</head>
+
+<body>
+<div class="capa">
+<div class="caja">
+
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <h2 style="margin:0;">Registro de Parqueo</h2>
+        <a class="vehiculos" asp-controller="Vehiculos" asp-action="Index">Gestión de Vehículos</a>
+        <a class="celdas" asp-controller="Celdas" asp-action="Index">Celdas</a>
+        <a class="logout" asp-controller="Login" asp-action="Salir">Cerrar sesión</a>
+    </div>
+
+    <div class="grid" style="margin-top:14px;">
+
+        <div class="tarjeta">
+            <h3 style="margin-top:0;">Entrada (Ingreso automático)</h3>
+
+            <form id="formIngreso" onsubmit="return false;">
+                <label>Placa (debe existir en Vehículos)</label>
+                <input type="text" id="placaIngreso" list="listaVehiculos" placeholder="Ej: ABC123">
+                <datalist id="listaVehiculos"></datalist>
+
+                <label>Celda (debe existir y estar Disponible)</label>
+                <input type="text" id="celdaIngreso" list="listaCeldas" placeholder="Ej: A01">
+                <datalist id="listaCeldas"></datalist>
+
+                <div class="fila-botones">
+                    <button type="button" class="ingreso" onclick="registrarIngreso()">Registrar Ingreso</button>
+                    <button type="button" class="cancelar" onclick="limpiarIngreso()">Limpiar</button>
+                </div>
+
+                <small class="nota">* La fecha/hora de ingreso se asigna sola al momento de guardar.</small>
+            </form>
+        </div>
+
+        <div class="tarjeta">
+            <h3 style="margin-top:0;">Salida (Buscar por placa)</h3>
+
+            <label>Placa (vehículo activo)</label>
+            <input type="text" id="placaSalida" list="listaActivos" placeholder="Ej: ABC123">
+            <datalist id="listaActivos"></datalist>
+
+            <div class="fila-botones">
+                <button type="button" class="salida" onclick="darSalidaPorPlaca()">Dar salida</button>
+                <button type="button" class="cancelar" onclick="document.getElementById('placaSalida').value=''">Limpiar</button>
+            </div>
+
+            <small class="nota">* La fecha/hora de salida se asigna sola cuando le das salida.</small>
+        </div>
+
+    </div>
+
+    <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <div style="flex:1; min-width:260px;">
+            <label><b>Buscar en tabla por placa</b></label>
+            <input type="text" id="filtroPlaca" placeholder="Escribe una placa..." oninput="cargarTabla()">
+        </div>
+        <div style="min-width:220px;">
+            <label><b>Mostrar</b></label>
+            <select id="filtroEstado" onchange="cargarTabla()">
+                <option value="todos">Todos</option>
+                <option value="activos">Activos (sin salida)</option>
+                <option value="finalizados">Finalizados</option>
+            </select>
+        </div>
+    </div>
+
+    <table id="tabla">
+        <thead>
+            <tr>
+                <th>Placa</th>
+                <th>Tipo</th>
+                <th>Marca</th>
+                <th>Color</th>
+                <th>Ingreso</th>
+                <th>Salida</th>
+                <th>Celda</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+</div>
+</div>
+
+<script>
+const KEY_CELDAS    = "autoscolombia_celdas";
+const KEY_VEHICULOS = "autoscolombia_vehiculos_catalogo";
+const KEY_PARQUEOS  = "autoscolombia_parqueos";
+
+function getJson(key){
+    try{ return JSON.parse(localStorage.getItem(key) || "[]"); }
+    catch(e){ return []; }
+}
+function setJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizarPlaca(placa){
+    return (placa || "").trim().toUpperCase();
+}
+function normalizarCodigo(codigo){
+    return (codigo || "").trim().toUpperCase();
+}
+
+function ahoraIsoLocal(){
+    // formato "YYYY-MM-DDTHH:mm" (suficiente para datetime-local)
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
+function buscarVehiculo(placa){
+    const vehiculos = getJson(KEY_VEHICULOS);
+    return vehiculos.find(v => v.placa === placa);
+}
+
+function buscarCelda(codigo){
+    const celdas = getJson(KEY_CELDAS);
+    return celdas.find(c => c.codigo === codigo);
+}
+
+function hayParqueoActivoEnCelda(codigo){
+    const parqueos = getJson(KEY_PARQUEOS);
+    return parqueos.some(p => (p.celda || "") === codigo && !(p.salida && p.salida.trim() !== ""));
+}
+
+function setEstadoCelda(codigo, estado){
+    let celdas = getJson(KEY_CELDAS);
+    celdas = celdas.map(c => c.codigo === codigo ? { codigo: c.codigo, estado } : c);
+    setJson(KEY_CELDAS, celdas);
+}
+
+function recargarListas(){
+    // Vehículos
+    const vehiculos = getJson(KEY_VEHICULOS);
+    const dlVeh = document.getElementById("listaVehiculos");
+    dlVeh.innerHTML = "";
+    vehiculos.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.placa;
+        dlVeh.appendChild(opt);
+    });
+
+    // Celdas
+    const celdas = getJson(KEY_CELDAS);
+    const dlCel = document.getElementById("listaCeldas");
+    dlCel.innerHTML = "";
+    celdas.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.codigo;
+        dlCel.appendChild(opt);
+    });
+
+    // Activos
+    const parqueos = getJson(KEY_PARQUEOS);
+    const activos = parqueos.filter(p => !(p.salida && p.salida.trim() !== ""));
+    const dlAct = document.getElementById("listaActivos");
+    dlAct.innerHTML = "";
+    activos.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.placa;
+        dlAct.appendChild(opt);
+    });
+}
+
+function validarIngreso(placa, celda){
+    const v = buscarVehiculo(placa);
+    if(!v) return { ok:false, msg:"La placa no existe en Gestión de Vehículos. Regístrala primero." };
+
+    const c = buscarCelda(celda);
+    if(!c) return { ok:false, msg:"La celda no existe. Regístrala primero en Celdas." };
+    if(c.estado === "Inactiva") return { ok:false, msg:"La celda está Inactiva." };
+    if(c.estado === "Ocupada") return { ok:false, msg:"La celda está Ocupada." };
+    if(hayParqueoActivoEnCelda(celda)) return { ok:false, msg:"Esa celda ya tiene un vehículo activo." };
+
+    // No permitir doble parqueo activo del mismo vehículo
+    const parqueos = getJson(KEY_PARQUEOS);
+    const yaActivo = parqueos.some(p => p.placa === placa && !(p.salida && p.salida.trim() !== ""));
+    if(yaActivo) return { ok:false, msg:"Ese vehículo ya tiene un parqueo activo (sin salida)." };
+
+    return { ok:true, msg:"" };
+}
+
+function registrarIngreso(){
+    const placa = normalizarPlaca(document.getElementById("placaIngreso").value);
+    const celda = normalizarCodigo(document.getElementById("celdaIngreso").value);
+
+    if(!placa || !celda){
+        alert("Ingrese placa y celda.");
+        return;
+    }
+
+    const check = validarIngreso(placa, celda);
+    if(!check.ok){
+        alert(check.msg);
+        return;
+    }
+
+    const veh = buscarVehiculo(placa);
+    const ingreso = ahoraIsoLocal();
+    const id = "P" + Date.now();
+
+    let parqueos = getJson(KEY_PARQUEOS);
+    parqueos.push({
+        id,
+        placa,
+        celda,
+        ingreso,
+        salida: "",
+        tipo: veh.tipo,
+        marca: veh.marca,
+        color: veh.color
+    });
+    setJson(KEY_PARQUEOS, parqueos);
+
+    // ocupar celda
+    setEstadoCelda(celda, "Ocupada");
+
+    limpiarIngreso();
+    recargarListas();
+    cargarTabla();
+}
+
+function limpiarIngreso(){
+    document.getElementById("placaIngreso").value = "";
+    document.getElementById("celdaIngreso").value = "";
+}
+
+function darSalida(parqueoId){
+    let parqueos = getJson(KEY_PARQUEOS);
+    const p = parqueos.find(x => x.id === parqueoId);
+    if(!p){
+        alert("No se encontró el parqueo.");
+        return;
+    }
+    if(p.salida && p.salida.trim() !== ""){
+        alert("Este registro ya tiene salida.");
+        return;
+    }
+
+    const salida = ahoraIsoLocal();
+    parqueos = parqueos.map(x => x.id === parqueoId ? { ...x, salida } : x);
+    setJson(KEY_PARQUEOS, parqueos);
+
+    // liberar celda si no hay más activos ahí
+    if(!hayParqueoActivoEnCelda(p.celda)){
+        const c = buscarCelda(p.celda);
+        if(c && c.estado !== "Inactiva"){
+            setEstadoCelda(p.celda, "Disponible");
+        }
+    }
+
+    recargarListas();
+    cargarTabla();
+}
+
+function darSalidaPorPlaca(){
+    const placa = normalizarPlaca(document.getElementById("placaSalida").value);
+    if(!placa){
+        alert("Escriba una placa.");
+        return;
+    }
+
+    const parqueos = getJson(KEY_PARQUEOS);
+    const p = parqueos.find(x => x.placa === placa && !(x.salida && x.salida.trim() !== ""));
+    if(!p){
+        alert("No se encontró un parqueo activo para esa placa.");
+        return;
+    }
+    darSalida(p.id);
+    document.getElementById("placaSalida").value = "";
+}
+
+function eliminarParqueo(id){
+    if(!confirm("¿Seguro que deseas eliminar este registro?")) return;
+
+    let parqueos = getJson(KEY_PARQUEOS);
+    const p = parqueos.find(x => x.id === id);
+
+    parqueos = parqueos.filter(x => x.id !== id);
+    setJson(KEY_PARQUEOS, parqueos);
+
+    // si era activo, liberar celda
+    if(p && !(p.salida && p.salida.trim() !== "")){
+        if(!hayParqueoActivoEnCelda(p.celda)){
+            const c = buscarCelda(p.celda);
+            if(c && c.estado !== "Inactiva"){
+                setEstadoCelda(p.celda, "Disponible");
+            }
+        }
+    }
+
+    recargarListas();
+    cargarTabla();
+}
+
+function cargarTabla(){
+    const filtro = normalizarPlaca(document.getElementById("filtroPlaca").value);
+    const estado = document.getElementById("filtroEstado").value;
+
+    const parqueos = getJson(KEY_PARQUEOS);
+    const tbody = document.querySelector("#tabla tbody");
+    tbody.innerHTML = "";
+
+    let lista = [...parqueos];
+
+    if(filtro){
+        lista = lista.filter(p => (p.placa || "").includes(filtro));
+    }
+    if(estado === "activos"){
+        lista = lista.filter(p => !(p.salida && p.salida.trim() !== ""));
+    }
+    if(estado === "finalizados"){
+        lista = lista.filter(p => (p.salida && p.salida.trim() !== ""));
+    }
+
+    // más reciente arriba
+    lista.sort((a,b) => (b.ingreso || "").localeCompare(a.ingreso || ""));
+
+    lista.forEach(p => {
+        const activo = !(p.salida && p.salida.trim() !== "");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${p.placa}</td>
+            <td>${p.tipo || ""}</td>
+            <td>${p.marca || ""}</td>
+            <td>${p.color || ""}</td>
+            <td>${p.ingreso || ""}</td>
+            <td>${p.salida || ""}</td>
+            <td>${p.celda || ""}</td>
+            <td class="acciones">
+                ${activo ? `<button class="btn-salir" type="button" onclick="darSalida('${p.id}')">Salir</button>` : ``}
+                <button class="btn-del" type="button" onclick="eliminarParqueo('${p.id}')">Eliminar</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Inicial
+recargarListas();
+cargarTabla();
+</script>
+
+</body>
+</html>

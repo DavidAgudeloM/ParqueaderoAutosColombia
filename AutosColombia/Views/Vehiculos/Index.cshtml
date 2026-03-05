@@ -6,7 +6,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Vehículos</title>
+    <title>Gestión de Vehículos</title>
 
     <style>
         body{
@@ -31,7 +31,7 @@
             border-radius:10px;
         }
 
-        input{
+        input, select{
             width:100%;
             padding:6px;
             margin-bottom:10px;
@@ -56,8 +56,8 @@
 
         .guardar{ background:#2ecc71; }
         .cancelar{ background:#95a5a6; }
-        .celdas{ background:#3498db; }
-        .volver{ background:#8e44ad; }
+        .parqueo{ background:#3498db; }
+        .celdas{ background:#8e44ad; }
         .logout{ background:#e74c3c; margin-left:auto; }
 
         table{
@@ -72,9 +72,7 @@
             text-align:center;
         }
 
-        th{
-            background:#eee;
-        }
+        th{ background:#eee; }
 
         .acciones button{
             padding:6px 10px;
@@ -90,8 +88,9 @@
 <div class="caja">
 
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <h2 style="margin:0;">Registro de Vehículos</h2>
-        <button type="button" class="volver" onclick="history.back()">Volver atrás</button>
+        <h2 style="margin:0;">Gestión de Vehículos</h2>
+        <a class="parqueo" asp-controller="Parqueo" asp-action="Index">Ir a Registro de Parqueo</a>
+        <a class="celdas" asp-controller="Celdas" asp-action="Index">Ir a Celdas</a>
         <a class="logout" asp-controller="Login" asp-action="Salir">Cerrar sesión</a>
     </div>
 
@@ -101,24 +100,29 @@
         <label>Placa</label>
         <input type="text" id="placa" placeholder="Ej: ABC123" required>
 
-        <label>Fecha Entrada</label>
-        <input type="datetime-local" id="entrada" required>
+        <label>Tipo de vehículo</label>
+        <select id="tipo" required>
+            <option value="">-- Seleccione --</option>
+            <option>Carro</option>
+            <option>Moto</option>
+            <option>Camioneta</option>
+            <option>Camión</option>
+            <option>Otro</option>
+        </select>
 
-        <label>Fecha Salida</label>
-        <input type="datetime-local" id="salida">
+        <label>Marca</label>
+        <input type="text" id="marca" placeholder="Ej: Mazda" required>
 
-        <label>Celda (debe existir)</label>
-        <input type="text" id="celda" list="listaCeldas" placeholder="Ej: A01" required>
-        <datalist id="listaCeldas"></datalist>
+        <label>Color</label>
+        <input type="text" id="color" placeholder="Ej: Rojo" required>
 
         <div class="fila-botones">
             <button type="button" class="guardar" onclick="guardarVehiculo()">Guardar</button>
             <button type="button" class="cancelar" onclick="cancelarEdicion()">Cancelar</button>
-            <a class="celdas" asp-controller="Celdas" asp-action="Index">Ir a Celdas</a>
         </div>
 
         <small style="display:block; margin-top:8px; color:#333;">
-            * No permite guardar si la celda no existe o está Inactiva/Ocupada.
+            * Esta pantalla es solo para <b>registrar los vehículos</b>. El parqueo (entrada/salida/celda) se maneja en <b>Registro de Parqueo</b>.
         </small>
     </form>
 
@@ -126,9 +130,9 @@
         <thead>
             <tr>
                 <th>Placa</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-                <th>Celda</th>
+                <th>Tipo</th>
+                <th>Marca</th>
+                <th>Color</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -139,15 +143,12 @@
 </div>
 
 <script>
-const KEY_CELDAS = "autoscolombia_celdas";
-const KEY_VEHICULOS = "autoscolombia_vehiculos";
+const KEY_VEHICULOS = "autoscolombia_vehiculos_catalogo";
+const KEY_PARQUEOS  = "autoscolombia_parqueos";
 
 function getJson(key){
-    try{
-        return JSON.parse(localStorage.getItem(key) || "[]");
-    }catch(e){
-        return [];
-    }
+    try{ return JSON.parse(localStorage.getItem(key) || "[]"); }
+    catch(e){ return []; }
 }
 function setJson(key, value){
     localStorage.setItem(key, JSON.stringify(value));
@@ -156,19 +157,11 @@ function setJson(key, value){
 function normalizarPlaca(placa){
     return (placa || "").trim().toUpperCase();
 }
-function normalizarCodigo(codigo){
-    return (codigo || "").trim().toUpperCase();
-}
 
-function cargarListaCeldas(){
-    const celdas = getJson(KEY_CELDAS);
-    const dl = document.getElementById("listaCeldas");
-    dl.innerHTML = "";
-    celdas.forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c.codigo;
-        dl.appendChild(opt);
-    });
+function hayParqueoActivo(placa){
+    const parqueos = getJson(KEY_PARQUEOS);
+    const p = parqueos.find(x => (x.placa || "") === placa && !(x.salida && x.salida.trim() !== ""));
+    return !!p;
 }
 
 function cargarTabla(){
@@ -180,182 +173,94 @@ function cargarTabla(){
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${v.placa}</td>
-            <td>${v.entrada || ""}</td>
-            <td>${v.salida || ""}</td>
-            <td>${v.celda || ""}</td>
+            <td>${v.tipo}</td>
+            <td>${v.marca}</td>
+            <td>${v.color}</td>
             <td class="acciones">
-                <button class="edit" type="button" onclick="editarVehiculo('${v.id}')">Editar</button>
-                <button class="del" type="button" onclick="eliminarVehiculo('${v.id}')">Eliminar</button>
+                <button class="edit" type="button" onclick="editarVehiculo('${v.placa}')">Editar</button>
+                <button class="del" type="button" onclick="eliminarVehiculo('${v.placa}')">Eliminar</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-function validarCeldaDisponible(codigo, vehiculoIdEnEdicion){
-    const celdas = getJson(KEY_CELDAS);
-    const celda = celdas.find(c => c.codigo === codigo);
-
-    if(!celda){
-        return { ok:false, msg:"La celda no existe. Primero regístrala en Celdas." };
-    }
-    if(celda.estado === "Inactiva"){
-        return { ok:false, msg:"La celda está Inactiva." };
-    }
-
-    // Si está Ocupada, solo permitir si es la misma celda del vehículo que se está editando
-    if(celda.estado === "Ocupada"){
-        const vehiculos = getJson(KEY_VEHICULOS);
-        const v = vehiculos.find(x => x.id === vehiculoIdEnEdicion);
-        if(!v || v.celda !== codigo){
-            return { ok:false, msg:"La celda está Ocupada." };
-        }
-    }
-
-    return { ok:true, msg:"" };
-}
-
-function setEstadoCelda(codigo, estado){
-    let celdas = getJson(KEY_CELDAS);
-    celdas = celdas.map(c => c.codigo === codigo ? { codigo: c.codigo, estado } : c);
-    setJson(KEY_CELDAS, celdas);
-}
-
-function hayVehiculoActivoEnCelda(codigo, exceptoVehiculoId){
-    const vehiculos = getJson(KEY_VEHICULOS);
-    return vehiculos.some(v => v.id !== exceptoVehiculoId && (v.celda || "") === codigo && !(v.salida && v.salida.trim() !== ""));
-}
-
 function guardarVehiculo(){
-    let placa = normalizarPlaca(document.getElementById("placa").value);
-    let entrada = document.getElementById("entrada").value;
-    let salida = document.getElementById("salida").value;
-    let celda = normalizarCodigo(document.getElementById("celda").value);
-    let modo = document.getElementById("modoEdicion").value; // "" o id
+    const placa = normalizarPlaca(document.getElementById("placa").value);
+    const tipo  = (document.getElementById("tipo").value || "").trim();
+    const marca = (document.getElementById("marca").value || "").trim();
+    const color = (document.getElementById("color").value || "").trim();
+    const modo  = document.getElementById("modoEdicion").value; // "" o placa
 
-    if(!placa || !entrada || !celda){
-        alert("Complete los campos obligatorios (placa, entrada, celda).");
-        return;
-    }
-
-    const check = validarCeldaDisponible(celda, modo || null);
-    if(!check.ok){
-        alert(check.msg);
+    if(!placa || !tipo || !marca || !color){
+        alert("Complete todos los campos.");
         return;
     }
 
     let vehiculos = getJson(KEY_VEHICULOS);
+    const existe = vehiculos.some(v => v.placa === placa);
 
     if(modo === ""){
-        // Create
-        // Si hay un vehículo activo en esa celda, no permitir (por seguridad)
-        if(hayVehiculoActivoEnCelda(celda, null)){
-            alert("Esa celda ya tiene un vehículo activo.");
+        if(existe){
+            alert("Esa placa ya está registrada.");
             return;
         }
-
-        const id = "V" + Date.now();
-        vehiculos.push({ id, placa, entrada, salida, celda });
-
-        // Marcar celda ocupada si el vehículo NO tiene salida
-        if(!salida){
-            setEstadoCelda(celda, "Ocupada");
-        }
-
+        vehiculos.push({ placa, tipo, marca, color });
     }else{
-        // Update
-        const actual = vehiculos.find(v => v.id === modo);
-        if(!actual){
-            alert("No se encontró el registro para editar.");
-            cancelarEdicion();
+        const placaOriginal = modo;
+
+        // si cambió la placa, validar duplicado
+        if(placa !== placaOriginal && existe){
+            alert("No puedes cambiar la placa a una que ya exista.");
             return;
         }
 
-        const celdaAnterior = actual.celda;
-
-        // Si cambió de celda y la nueva tiene vehículo activo, no permitir
-        if(celda !== celdaAnterior && hayVehiculoActivoEnCelda(celda, modo)){
-            alert("La celda nueva ya tiene un vehículo activo.");
+        // Si el vehículo tiene un parqueo activo, no permitir cambiar la placa (para no romper la salida)
+        if(placa !== placaOriginal && hayParqueoActivo(placaOriginal)){
+            alert("No puedes cambiar la placa porque ese vehículo tiene un parqueo activo (sin salida).");
             return;
         }
 
-        // Actualizar vehículo
-        vehiculos = vehiculos.map(v => v.id === modo ? { id: modo, placa, entrada, salida, celda } : v);
+        vehiculos = vehiculos.map(v => v.placa === placaOriginal ? { placa, tipo, marca, color } : v);
         setJson(KEY_VEHICULOS, vehiculos);
 
-        // Lógica de estados de celdas:
-        // 1) Si cambió de celda, liberar la anterior si ya no hay activos ahí
-        if(celdaAnterior && celdaAnterior !== celda){
-            if(!hayVehiculoActivoEnCelda(celdaAnterior, null)){
-                // Solo dejar Disponible si no está Inactiva
-                const celdas = getJson(KEY_CELDAS);
-                const cAnt = celdas.find(c => c.codigo === celdaAnterior);
-                if(cAnt && cAnt.estado !== "Inactiva"){
-                    setEstadoCelda(celdaAnterior, "Disponible");
-                }
-            }
+        // si cambió la placa, actualizar parqueos históricos
+        if(placa !== placaOriginal){
+            let parqueos = getJson(KEY_PARQUEOS);
+            parqueos = parqueos.map(p => (p.placa || "") === placaOriginal ? { ...p, placa } : p);
+            setJson(KEY_PARQUEOS, parqueos);
         }
-
-        // 2) Para la celda actual: si no tiene salida => Ocupada, si tiene salida => Disponible (si no hay otros activos)
-        if(!salida){
-            setEstadoCelda(celda, "Ocupada");
-        }else{
-            if(!hayVehiculoActivoEnCelda(celda, null)){
-                const celdas = getJson(KEY_CELDAS);
-                const cNow = celdas.find(c => c.codigo === celda);
-                if(cNow && cNow.estado !== "Inactiva"){
-                    setEstadoCelda(celda, "Disponible");
-                }
-            }
-        }
-
-        cancelarEdicion();
-        cargarListaCeldas();
-        cargarTabla();
-        return;
     }
 
     setJson(KEY_VEHICULOS, vehiculos);
-
     cancelarEdicion();
-    cargarListaCeldas();
     cargarTabla();
 }
 
-function editarVehiculo(id){
+function editarVehiculo(placa){
     const vehiculos = getJson(KEY_VEHICULOS);
-    const v = vehiculos.find(x => x.id === id);
+    const v = vehiculos.find(x => x.placa === placa);
     if(!v) return;
 
-    document.getElementById("placa").value = v.placa || "";
-    document.getElementById("entrada").value = v.entrada || "";
-    document.getElementById("salida").value = v.salida || "";
-    document.getElementById("celda").value = v.celda || "";
-    document.getElementById("modoEdicion").value = v.id;
+    document.getElementById("placa").value = v.placa;
+    document.getElementById("tipo").value  = v.tipo;
+    document.getElementById("marca").value = v.marca;
+    document.getElementById("color").value = v.color;
+    document.getElementById("modoEdicion").value = v.placa;
 }
 
-function eliminarVehiculo(id){
-    if(!confirm("¿Seguro que deseas eliminar este registro?")) return;
-
-    let vehiculos = getJson(KEY_VEHICULOS);
-    const v = vehiculos.find(x => x.id === id);
-
-    vehiculos = vehiculos.filter(x => x.id !== id);
-    setJson(KEY_VEHICULOS, vehiculos);
-
-    // Si era el único vehículo activo en esa celda, liberar
-    if(v && v.celda){
-        if(!hayVehiculoActivoEnCelda(v.celda, null)){
-            const celdas = getJson(KEY_CELDAS);
-            const cNow = celdas.find(c => c.codigo === v.celda);
-            if(cNow && cNow.estado !== "Inactiva"){
-                setEstadoCelda(v.celda, "Disponible");
-            }
-        }
+function eliminarVehiculo(placa){
+    placa = normalizarPlaca(placa);
+    if(hayParqueoActivo(placa)){
+        alert("No puedes eliminar este vehículo porque tiene un parqueo activo (sin salida).");
+        return;
     }
 
+    if(!confirm("¿Seguro que deseas eliminar el vehículo " + placa + "?")) return;
+    let vehiculos = getJson(KEY_VEHICULOS);
+    vehiculos = vehiculos.filter(v => v.placa !== placa);
+    setJson(KEY_VEHICULOS, vehiculos);
     cancelarEdicion();
-    cargarListaCeldas();
     cargarTabla();
 }
 
@@ -364,8 +269,6 @@ function cancelarEdicion(){
     document.getElementById("formVehiculo").reset();
 }
 
-// Inicial
-cargarListaCeldas();
 cargarTabla();
 </script>
 

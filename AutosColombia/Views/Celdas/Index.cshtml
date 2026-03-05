@@ -107,7 +107,7 @@
         <div class="fila-botones">
             <button type="button" class="btn-guardar" onclick="guardarCelda()">Guardar</button>
             <button type="button" class="btn-cancelar" onclick="cancelarEdicion()">Cancelar</button>
-            <a class="btn-vehiculos" asp-controller="Vehiculos" asp-action="Index">Ir a Vehículos</a>
+            <a class="btn-vehiculos" asp-controller="Parqueo" asp-action="Index">Ir a Registro de Parqueo</a>
         </div>
         <small style="display:block; margin-top:8px; color:#333;">
             * Los datos se guardan en el navegador (localStorage), así no se borran al cambiar de interfaz.
@@ -130,7 +130,7 @@
 
 <script>
 const KEY_CELDAS = "autoscolombia_celdas";
-const KEY_VEHICULOS = "autoscolombia_vehiculos";
+const KEY_PARQUEOS = "autoscolombia_parqueos";
 
 function getJson(key){
     try{
@@ -202,16 +202,16 @@ function guardarCelda(){
             return c;
         });
 
-        // si cambió el código, también toca actualizar vehículos que apunten a esa celda
+        // si cambió el código, también toca actualizar parqueos que apunten a esa celda
         if(codigo !== codigoOriginal){
-            let vehiculos = getJson(KEY_VEHICULOS);
-            vehiculos = vehiculos.map(v => {
-                if((v.celda || "") === codigoOriginal){
-                    v.celda = codigo;
+            let parqueos = getJson(KEY_PARQUEOS);
+            parqueos = parqueos.map(p => {
+                if((p.celda || "") === codigoOriginal){
+                    p.celda = codigo;
                 }
-                return v;
+                return p;
             });
-            setJson(KEY_VEHICULOS, vehiculos);
+            setJson(KEY_PARQUEOS, parqueos);
         }
     }
 
@@ -232,8 +232,8 @@ function editarCelda(codigo){
 
 function eliminarCelda(codigo){
     // Regla: no dejar borrar si hay vehículo activo usando esa celda (sin salida)
-    const vehiculos = getJson(KEY_VEHICULOS);
-    const activos = vehiculos.some(v => (v.celda || "") === codigo && !(v.salida && v.salida.trim() !== ""));
+    const parqueos = getJson(KEY_PARQUEOS);
+    const activos = parqueos.some(p => (p.celda || "") === codigo && !(p.salida && p.salida.trim() !== ""));
     if(activos){
         alert("No puedes eliminar esta celda porque tiene un vehículo activo (sin salida).");
         return;

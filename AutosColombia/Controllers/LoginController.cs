@@ -16,7 +16,8 @@ namespace AutosColombia.Controllers
             if (usuario == "admin" && clave == "1234")
             {
                 HttpContext.Session.SetString("usuario", usuario);
-                return RedirectToAction("Index", "Vehiculos");
+                // Después de login, entrar al módulo principal: Registro de Parqueo
+                return RedirectToAction("Index", "Parqueo");
             }
 
             ViewBag.Error = "Datos incorrectos";
